@@ -1,0 +1,189 @@
+name: release
+# Builds the installers for every system, runs the smoke test on each build, and
+# writes a draft GitHub release with the installers and the changelog section.
+# Publishing the draft writes the v<version> tag; this workflow writes no tag.
+#
+# The version must already be in package.json and have a section in
+# CHANGELOG.md, so the repository records what went out.
+#
+# Signing: with the APPLE_* secrets, the macOS build is signed with Developer
+# ID and notarized. Without them, it is signed ad hoc. Windows builds are not
+# signed yet.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: version to release, e.g. 0.1.0
+        type: string
+        required: true
+      dry_run:
+        description: build only, write no release
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check the version
+        id: version
+        # Through the environment, because the input is outside text.
+        env:
+          given: ${{ inputs.version }}
+        run: |
+          version=${given#v}
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::'$given' is not a version such as 0.1.0"
+            exit 1
+          fi
+          in_package=$(node -p "require('./package.json').version")
+          if [ "$in_package" != "$version" ]; then
+            echo "::error::package.json says $in_package, not $version"
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "v$version" > /dev/null 2>&1; then
+            echo "::error::the tag v$version exists already"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check the changelog
+        run: node .github/scripts/changelog-section.mjs "${{ steps.version.outputs.version }}"
+
+  build:
+    needs: check
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: macos-latest
+            platform: macos-universal
+            args: --target universal-apple-darwin
+            targets: aarch64-apple-darwin,x86_64-apple-darwin
+            bundle: src-tauri/target/universal-apple-darwin/release/bundle
+            app: src-tauri/target/universal-apple-darwin/release/opendocument-desktop
+          - os: windows-latest
+            platform: windows-x64
+            bundle: src-tauri/target/release/bundle
+            app: src-tauri/target/release/opendocument-desktop.exe
+          # 22.04, so the packages run on systems with an older glibc too.
+          - os: ubuntu-22.04
+            platform: linux-x64
+            bundle: src-tauri/target/release/bundle
+            app: src-tauri/target/release/opendocument-desktop
+          - os: ubuntu-22.04-arm
+            platform: linux-arm64
+            bundle: src-tauri/target/release/bundle
+            app: src-tauri/target/release/opendocument-desktop
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install the Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libxdo-dev xvfb
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.targets }}
+
+      - name: Use the Apple signing secrets
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+        run: |
+          # Only set what exists: Tauri reads an empty variable as a value.
+          if [ -n "$APPLE_CERTIFICATE" ] && [ -n "$APPLE_SIGNING_IDENTITY" ]; then
+            {
+              echo "APPLE_CERTIFICATE=$APPLE_CERTIFICATE"
+              echo "APPLE_CERTIFICATE_PASSWORD=$APPLE_CERTIFICATE_PASSWORD"
+              echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY"
+            } >> "$GITHUB_ENV"
+            echo "Signing with Developer ID."
+          else
+            echo "::warning::no Developer ID secrets, so the macOS build is signed ad hoc"
+          fi
+          if [ -n "$APPLE_API_KEY_CONTENT" ] && [ -n "$APPLE_API_KEY" ] && [ -n "$APPLE_API_ISSUER" ]; then
+            key="$RUNNER_TEMP/AuthKey_$APPLE_API_KEY.p8"
+            printf '%s' "$APPLE_API_KEY_CONTENT" > "$key"
+            {
+              echo "APPLE_API_ISSUER=$APPLE_API_ISSUER"
+              echo "APPLE_API_KEY=$APPLE_API_KEY"
+              echo "APPLE_API_KEY_PATH=$key"
+            } >> "$GITHUB_ENV"
+            echo "Notarizing."
+          fi
+
+      - run: npm ci
+      - run: npm run check
+      - run: npx tauri build ${{ matrix.args }}
+
+      - name: Smoke test
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a node test/smoke.mjs "${{ matrix.app }}"
+          else
+            node test/smoke.mjs "${{ matrix.app }}"
+          fi
+
+      - name: Collect the installers
+        shell: bash
+        run: .github/scripts/collect-bundles.sh "${{ matrix.bundle }}" release "${{ needs.check.outputs.version }}" "${{ matrix.platform }}"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: release-${{ matrix.platform }}
+          path: release/
+          if-no-files-found: error
+
+  release:
+    needs: [check, build]
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: release-*
+          path: release
+          merge-multiple: true
+
+      - name: Write the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          version: ${{ needs.check.outputs.version }}
+        run: |
+          node .github/scripts/changelog-section.mjs "$version" > notes.md
+          (cd release && sha256sum * > SHA256SUMS.txt)
+          gh release create "v$version" release/* \
+            --draft \
+            --target "$GITHUB_SHA" \
+            --title "$version" \
+            --notes-file notes.md
