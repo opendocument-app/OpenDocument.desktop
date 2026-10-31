@@ -8,6 +8,8 @@ Before a release, a pull request changes that heading to the version.
 
 ## Unreleased
 
+## 0.1.0
+
 - The first version of OpenDocument Reader for Windows, macOS and Linux. It opens
   OpenDocument, Word, Excel, PowerPoint, PDF, Pages, Numbers, Keynote and more,
   also with a password.

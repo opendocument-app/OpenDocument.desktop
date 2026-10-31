@@ -144,6 +144,10 @@
         "mimeType": "application/vnd.apple.keynote",
         "role": "Viewer"
       }
-    ]
+    ],
+    "macOS": {
+      "signingIdentity": "-",
+      "minimumSystemVersion": "11.0"
+    }
   }
 }
