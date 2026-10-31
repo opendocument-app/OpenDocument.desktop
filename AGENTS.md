@@ -11,6 +11,50 @@ The frontend owns the user interface, and it runs the core.
 The renderer is [OpenDocument.core](https://github.com/opendocument-app/OpenDocument.core).
 Unsupported formats and rendering bugs belong there, not here.
 
+## Architecture
+
+```
+src/core/backend.ts        the Backend interface: the only way to the core
+src/core/wasm-*.ts         the Backend over the WebAssembly core, in a Web Worker
+src/viewer/viewer.ts       one window: open, render, tabs, search, zoom, edit, save, print
+src/viewer/frame-bridge.js runs inside the rendered document, talks over postMessage
+src/platform.ts            files, dialogs, menus, recents: everything from Tauri
+src-tauri/src/lib.rs       file access, window routing, print windows, smoke mode
+src-tauri/src/menu.rs      the menu bar; a click is a `menu` event to the focused window
+```
+
+- **The engine is behind `Backend`.** The viewer calls nothing else of the
+  core. A native backend, for example the core's HTTP server as a sidecar, can
+  replace the WebAssembly one without a change to the viewer.
+- **The viewer comes from the website.** `viewer.ts` and `frame-bridge.js` are
+  ports of `src/scripts/` in OpenDocument.web. A fix in one is usually a fix in
+  the other. The rendered document runs in a `sandbox="allow-scripts"` frame
+  with an opaque origin, so it cannot reach Tauri.
+- **One document per window.** A file that arrives while a window holds a
+  document opens a new window. On macOS the system sends files with
+  `RunEvent::Opened`, on Windows and Linux a second launch hands its arguments
+  to the first through the single-instance plugin.
+- **A save writes a temporary file beside the target and renames it over the
+  target**, so a failed save never leaves half a document.
+- **Print renders the view again** with every part laid out, and a `print-*`
+  window shows it as a top-level page. On macOS, Tauri prints only a top-level
+  page, not a frame. The print windows get no file access.
+- **The CSP keeps `'unsafe-inline'`**, because the srcdoc frame takes the
+  policy of its parent and the renderer writes inline scripts and styles.
+  `dangerousDisableAssetCspModification` stops Tauri from adding hashes, which
+  would switch `'unsafe-inline'` off.
+- **No Undo item in the menu.** The page owns its edit log and takes the undo
+  chord itself.
+- **No edition gate, no ads, no store.** How the desktop app earns money is
+  not decided yet.
+
+## Checks
+
+- `npm run check` type-checks the frontend.
+- `node test/smoke.mjs <app binary>` opens every file in `test/documents/` in
+  the built app and saves a copy. CI runs it on all three systems. A file named
+  `*-<password>.<ext>` opens with that password.
+
 ## Rules
 
 - The app compiles no C++. It uses the WebAssembly build of the core from npm,
