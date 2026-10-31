@@ -1,0 +1,14 @@
+node_modules/
+dist/
+
+# Copied from node_modules by `scripts/sync-odr.mjs`. npm holds the version,
+# so we do not commit the copy.
+public/odr/
+
+src-tauri/target/
+src-tauri/gen/
+
+.DS_Store
+*.log
+.env
+.env.*
