@@ -20,7 +20,9 @@ npm run tauri dev     # starts the app with hot reload
 npm run tauri build   # writes the installers to src-tauri/target/release/bundle/
 ```
 
-`npm run check` type-checks the frontend.
+`npm run check` type-checks the frontend. After a build,
+`node test/smoke.mjs src-tauri/target/release/opendocument-desktop` opens each
+document in `test/documents/` in the app and saves a copy.
 
 ## Layout
 
@@ -29,6 +31,7 @@ npm run tauri build   # writes the installers to src-tauri/target/release/bundle
 | `src/` | the frontend: TypeScript, Vite and Tailwind |
 | `src-tauri/` | the Rust shell: windows, menus, file access, bundling |
 | `scripts/sync-odr.mjs` | copies the core from `node_modules` into `public/odr/` |
+| `test/` | the smoke test and its documents |
 
 [`AGENTS.md`](AGENTS.md) describes the architecture and the rules.
 

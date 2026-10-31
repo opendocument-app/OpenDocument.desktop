@@ -21,7 +21,11 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self' ipc: http://ipc.localhost; frame-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'",
+      "dangerousDisableAssetCspModification": [
+        "script-src",
+        "style-src"
+      ]
     }
   },
   "bundle": {
@@ -39,6 +43,107 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": [
+          "odt"
+        ],
+        "name": "OpenDocument Text",
+        "description": "OpenDocument Text",
+        "mimeType": "application/vnd.oasis.opendocument.text",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "ods"
+        ],
+        "name": "OpenDocument Spreadsheet",
+        "description": "OpenDocument Spreadsheet",
+        "mimeType": "application/vnd.oasis.opendocument.spreadsheet",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "odp"
+        ],
+        "name": "OpenDocument Presentation",
+        "description": "OpenDocument Presentation",
+        "mimeType": "application/vnd.oasis.opendocument.presentation",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "odg"
+        ],
+        "name": "OpenDocument Drawing",
+        "description": "OpenDocument Drawing",
+        "mimeType": "application/vnd.oasis.opendocument.graphics",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "fodt"
+        ],
+        "name": "Flat OpenDocument Text",
+        "description": "Flat OpenDocument Text",
+        "mimeType": "application/vnd.oasis.opendocument.text-flat-xml",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "fods"
+        ],
+        "name": "Flat OpenDocument Spreadsheet",
+        "description": "Flat OpenDocument Spreadsheet",
+        "mimeType": "application/vnd.oasis.opendocument.spreadsheet-flat-xml",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "fodp"
+        ],
+        "name": "Flat OpenDocument Presentation",
+        "description": "Flat OpenDocument Presentation",
+        "mimeType": "application/vnd.oasis.opendocument.presentation-flat-xml",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "fodg"
+        ],
+        "name": "Flat OpenDocument Drawing",
+        "description": "Flat OpenDocument Drawing",
+        "mimeType": "application/vnd.oasis.opendocument.graphics-flat-xml",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "pages"
+        ],
+        "name": "Pages Document",
+        "description": "Pages Document",
+        "mimeType": "application/vnd.apple.pages",
+        "role": "Viewer"
+      },
+      {
+        "ext": [
+          "numbers"
+        ],
+        "name": "Numbers Spreadsheet",
+        "description": "Numbers Spreadsheet",
+        "mimeType": "application/vnd.apple.numbers",
+        "role": "Viewer"
+      },
+      {
+        "ext": [
+          "key"
+        ],
+        "name": "Keynote Presentation",
+        "description": "Keynote Presentation",
+        "mimeType": "application/vnd.apple.keynote",
+        "role": "Viewer"
+      }
     ]
   }
 }

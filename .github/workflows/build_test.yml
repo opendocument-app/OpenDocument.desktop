@@ -16,8 +16,11 @@ jobs:
       matrix:
         include:
           - os: macos-latest
+            app: src-tauri/target/release/opendocument-desktop
           - os: windows-latest
+            app: src-tauri/target/release/opendocument-desktop.exe
           - os: ubuntu-24.04
+            app: src-tauri/target/release/opendocument-desktop
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -26,7 +29,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libxdo-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libxdo-dev xvfb
 
       - uses: actions/setup-node@v5
         with:
@@ -42,6 +45,14 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npx tauri build
+
+      # Opens every file in test/documents in the built app, and saves a copy.
+      - name: Smoke test
+        if: runner.os != 'Linux'
+        run: node test/smoke.mjs ${{ matrix.app }}
+      - name: Smoke test
+        if: runner.os == 'Linux'
+        run: xvfb-run -a node test/smoke.mjs ${{ matrix.app }}
 
       - uses: actions/upload-artifact@v5
         with:
